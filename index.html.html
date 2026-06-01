@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Álbum Meli Londrina</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --egg:#F2B400;
+  --egg-dark:#C89000;
+  --egg-light:#FDF3CC;
+  --egg-pale:#FFFAED;
+  --grass:#2E7D32;
+  --grass-mid:#43A047;
+  --grass-light:#E8F5E9;
+  --grass-pale:#F1FAF2;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#F0EBE0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;}
+
+/* SETUP */
+.setup-ov{position:fixed;inset:0;background:rgba(10,8,4,.96);display:flex;align-items:center;justify-content:center;z-index:2000;padding:16px;}
+.setup-ov.hidden{display:none}
+.setup-box{background:#fff;border-radius:16px;padding:28px 24px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.18);border-top:4px solid var(--egg);}
+.setup-box h2{color:#1a1a1a;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;text-align:center}
+.setup-box p{color:#666;font-size:11px;text-align:center;margin-bottom:14px;line-height:1.6}
+.setup-box ol{color:#555;font-size:11px;padding-left:16px;margin-bottom:14px;line-height:2}
+.setup-box ol a{color:#1a5296}
+.setup-ta{width:100%;min-height:110px;resize:vertical;background:#fafafa;border:1px solid #ddd;border-radius:8px;color:#222;padding:10px 12px;font-size:11px;font-family:monospace;outline:none;transition:border-color .2s;margin-bottom:12px;}
+.setup-ta:focus{border-color:var(--egg)}
+.setup-btn{width:100%;padding:11px;border-radius:8px;background:var(--egg);color:#111;font-weight:700;border:none;cursor:pointer;font-size:13px;transition:opacity .2s;}
+.setup-btn:hover{opacity:.88}
+.setup-err{color:#c03030;font-size:11px;text-align:center;margin-top:8px;display:none}
+
+/* STATUS DOT */
+.fb-status{display:flex;align-items:center;gap:5px;font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#888}
+.fb-dot{width:6px;height:6px;border-radius:50%;background:#ccc;flex-shrink:0}
+.fb-dot.green{background:#22a855}
+.fb-dot.yellow{background:var(--egg);animation:pulse .9s infinite}
+.fb-dot.red{background:#d03030}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* PIN MODAL */
+.pin-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:3000;padding:16px;backdrop-filter:blur(4px)}
+.pin-ov.hidden{display:none}
+.pin-box{background:#fff;border-radius:14px;padding:24px 22px;max-width:300px;width:100%;box-shadow:0 16px 50px rgba(0,0,0,.2);border-top:3px solid var(--egg);text-align:center}
+.pin-box h3{font-size:14px;font-weight:700;color:#333;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.pin-box p{font-size:11px;color:#888;margin-bottom:14px}
+.pin-input{width:100%;padding:10px;text-align:center;font-size:18px;letter-spacing:4px;border:1px solid #ddd;border-radius:8px;outline:none;transition:border-color .2s;margin-bottom:10px;}
+.pin-input:focus{border-color:var(--egg)}
+.pin-btn{width:100%;padding:10px;border-radius:8px;background:var(--egg);color:#111;font-weight:700;border:none;cursor:pointer;font-size:13px;}
+.pin-btn:hover{opacity:.88}
+.pin-cancel{width:100%;padding:8px;border-radius:8px;background:#f0f0f0;color:#666;font-weight:500;border:none;cursor:pointer;font-size:12px;margin-top:7px;}
+.pin-err{color:#c03030;font-size:11px;text-align:center;margin-top:6px;display:none}
+
+/* ALBUM SHELL */
+.album-shell{width:100%;max-width:960px;display:flex;flex-direction:column;min-height:100vh;background:#fff;box-shadow:0 4px 40px rgba(0,0,0,.12);}
+
+/* TOPBAR */
+.topbar{background:#fff;border-bottom:4px solid var(--grass);border-top:3px solid var(--egg);padding:8px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.tb-brand{display:flex;align-items:center;gap:10px}
+.tb-logo{width:32px;height:32px;border-radius:8px;background:var(--egg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#111;}
+.tb-main{color:#111;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;line-height:1.2}
+.tb-sub{color:#aaa;font-size:7.5px;letter-spacing:1.5px;text-transform:uppercase}
+.tb-right{display:flex;align-items:center;gap:8px}
+.lock-btn{display:flex;align-items:center;gap:5px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:10px;font-weight:600;color:#666;transition:all .2s;}
+.lock-btn:hover{background:#eee}
+.lock-btn.admin{background:var(--egg-pale);border-color:var(--egg);color:#7a5800}
+.add-rep-btn{background:var(--egg-light);border:1px solid var(--egg);color:#7a5800;border-radius:5px;padding:4px 11px;cursor:pointer;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;transition:background .2s;display:none}
+.add-rep-btn:hover{background:var(--egg);color:#111}
+.add-rep-btn.visible{display:block}
+
+/* UNIT TABS */
+.unit-tabs{background:#fff;border-bottom:1px solid #eee;display:flex;flex-shrink:0;}
+.utab{padding:8px 22px;cursor:pointer;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:#aaa;border-bottom:2px solid transparent;transition:all .2s;background:none;border-top:none;border-left:none;border-right:none;}
+.utab:hover{color:#555;background:#fafafa}
+.utab.active{color:var(--grass);border-bottom-color:var(--grass);background:var(--grass-pale)}
+
+/* PAGE NAV */
+.page-nav{background:#fff;border-bottom:1px solid #eee;padding:7px 16px;display:flex;align-items:center;gap:6px;flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
+.page-nav::-webkit-scrollbar{display:none}
+.pnav-btn{background:#f5f5f5;border:1px solid #e0e0e0;color:#888;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:10px;font-weight:500;transition:all .2s;white-space:nowrap;text-transform:uppercase;letter-spacing:.3px;}
+.pnav-btn:hover{background:#eee;color:#333}
+.pnav-btn.active{color:var(--grass);border-color:var(--grass-mid);background:var(--grass-pale);font-weight:700}
+.pnav-sep{color:#ccc;font-size:11px;padding:0 2px;flex-shrink:0}
+
+/* VIEW BANNER */
+.view-banner{background:var(--egg-pale);border-bottom:1px solid #EDD88A;padding:6px 20px;text-align:center;font-size:10px;color:#9a7800;font-weight:500;display:none;}
+.view-banner.visible{display:block}
+
+/* PAGE AREA */
+.page-area{flex:1;overflow-y:auto;background:#fff;padding:28px 32px 24px;display:flex;flex-direction:column;gap:20px;min-height:0;}
+.page-area::-webkit-scrollbar{width:6px}
+.page-area::-webkit-scrollbar-thumb{background:#e0d8c0;border-radius:3px}
+
+/* SECTION HEADER */
+.sec-header{display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:2px solid var(--grass);}
+.sec-icon-wrap{width:52px;height:52px;border-radius:12px;background:var(--grass);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;box-shadow:0 2px 10px rgba(46,125,50,.3);}
+.sec-we-are{font-size:9px;font-weight:500;color:#bbb;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px}
+.sec-name-big{font-size:clamp(22px,4vw,34px);font-weight:700;text-transform:uppercase;letter-spacing:-.5px;color:#1a1a1a;line-height:1}
+.sec-meta{display:flex;align-items:center;gap:8px;margin-top:4px}
+.sec-unit-pill{background:var(--egg-light);border:1px solid var(--egg);color:#7a5800;border-radius:4px;padding:2px 8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.sec-slogan{font-size:10px;color:#aaa;font-style:italic}
+
+/* STICKER GRID — tamanho fixo por coluna para uniformidade no celular */
+.sticker-grid{display:grid;gap:10px;}
+.grid-4col{grid-template-columns:repeat(4,minmax(0,1fr))}
+.grid-5col{grid-template-columns:repeat(5,minmax(0,1fr))}
+.grid-6col{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media(max-width:600px){
+  .grid-4col{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .grid-5col{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .grid-6col{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .sticker-grid{gap:8px;}
+}
+
+/* SLOT */
+.slot-wrap{display:flex;flex-direction:column;align-items:stretch;gap:3px;cursor:default;position:relative}
+.slot-wrap.editable{cursor:pointer}
+.slot-wrap.editable:hover .slot{transform:scale(1.04);z-index:10;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.slot-del{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#c03030;color:#fff;font-size:11px;font-weight:700;border:2px solid #fff;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:20;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.25);padding:0}
+.slot-wrap.editable:hover .slot-del{display:flex}
+.slot-del:hover{background:#9a0000;transform:scale(1.15)}
+.slot-wrap.drag-over .slot{box-shadow:0 0 0 3px var(--grass),0 0 16px rgba(46,125,50,.35)!important;transform:scale(1.05)!important}
+.slot-wrap.dragging{opacity:.4;transform:scale(.95)}
+.slot{border-radius:8px;aspect-ratio:.68;position:relative;transition:transform .15s,box-shadow .15s;overflow:hidden}
+.slot.empty{background:linear-gradient(145deg,#F7F3EA,#EDE5D0);border:1.5px solid #DDD5BE;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;}
+.slot.empty .s-code{font-size:clamp(7px,1.1vw,10px);font-weight:500;color:#C0B090;text-transform:uppercase;letter-spacing:.4px}
+.slot.empty .s-num{font-size:clamp(16px,3vw,28px);font-weight:700;color:#D8CCAA;line-height:1}
+.slot.empty .s-mark{position:absolute;bottom:4px;right:5px;font-size:7px;color:#C8BC98;font-weight:500}
+.slot.filled{box-shadow:0 3px 12px rgba(0,0,0,.15)}
+.slot.filled::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 35%,rgba(255,255,255,.12) 55%,transparent 80%);pointer-events:none;z-index:3}
+.slot .s-photo{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+.slot .s-num-placed{position:absolute;top:4px;left:5px;font-size:8px;font-weight:600;color:rgba(255,255,255,.9);background:rgba(0,0,0,.45);padding:1px 4px;border-radius:3px;font-family:monospace;z-index:4}
+.s-below{background:#1a1a1a;border-radius:0 0 7px 7px;padding:4px 5px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
+.s-below .s-name{color:#fff;font-weight:600;text-align:center;text-transform:uppercase;font-size:clamp(7px,1.1vw,9.5px);letter-spacing:.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.s-pos{font-size:clamp(5.5px,.85vw,8px);font-weight:600;padding:1px 5px;border-radius:3px;white-space:nowrap}
+
+/* Position badges - new cargo set */
+.p-Gerente   {background:#8a6200;color:#fff}
+.p-Supervisor{background:#a07800;color:#111}
+.p-TL        {background:var(--egg);color:#111}
+.p-Analista  {background:#d4a800;color:#111}
+.p-Op3       {background:#083878;color:#fff}
+.p-Op2       {background:#1458b0;color:#fff}
+.p-Rep1      {background:#0a5a28;color:#fff}
+.p-Rep2      {background:#189048;color:#fff}
+
+/* INFO STRIP */
+.info-strip{background:var(--grass-pale);border:1px solid var(--grass-light);border-radius:8px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;margin-top:4px;}
+.info-strip .is-label{color:#888;font-size:9px;font-weight:600;letter-spacing:.7px;text-transform:uppercase}
+.info-strip .is-count{font-size:13px;font-weight:700;color:var(--grass)}
+
+/* COVER */
+.cover-page{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 32px;gap:24px;background:linear-gradient(160deg,#fff 0%,var(--grass-pale) 60%,var(--egg-pale) 100%);}
+.cover-circle{width:220px;height:220px;border-radius:50%;border:4px solid var(--grass);display:flex;align-items:center;justify-content:center;position:relative;background:var(--grass-pale);box-shadow:0 0 0 3px var(--egg);}
+.cover-circle::before{content:'';position:absolute;inset:10px;border-radius:50%;border:1px solid rgba(46,125,50,.25)}
+.cover-inner-text{font-size:11px;color:#9a7800;text-transform:uppercase;letter-spacing:1.5px;text-align:center;line-height:2;font-weight:600}
+.cover-title h1{font-size:clamp(28px,6vw,52px);font-weight:700;color:#1a1a1a;text-transform:uppercase;letter-spacing:-1px;line-height:1;text-align:center}
+.cover-title h1 span{display:block;font-size:clamp(11px,2vw,16px);font-weight:500;color:#aaa;letter-spacing:3px;text-transform:uppercase}
+.cover-unit-badge{background:var(--egg);color:#111;font-size:14px;font-weight:700;padding:8px 24px;border-radius:8px;text-transform:uppercase;letter-spacing:2px;}
+.cover-teams{width:100%;max-width:320px;display:flex;flex-direction:column;gap:6px}
+.cover-team-item{background:#fff;border:1px solid #eee;border-radius:6px;padding:8px 12px;display:flex;align-items:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.cti-emoji{font-size:14px}.cti-name{font-size:11px;font-weight:600;color:#333;text-transform:uppercase;letter-spacing:.4px}.cti-slots{font-size:9px;color:#aaa;margin-left:auto;font-weight:600}
+.cover-edition{font-size:9px;color:var(--grass-mid);text-transform:uppercase;letter-spacing:2px;text-align:center;font-weight:600}
+.cover-photo-wrap{width:220px;height:220px;border-radius:50%;border:4px solid var(--grass);overflow:hidden;position:relative;background-size:cover;background-position:center top;box-shadow:0 0 0 3px var(--egg),0 4px 20px rgba(46,125,50,.3);}
+.cover-photo-overlay{position:absolute;inset:0;background:rgba(0,0,0,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.cover-photo-overlay .cover-inner-text{color:rgba(255,255,255,.92);text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.cover-photo-edit{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#fff;font-size:9px;padding:4px 12px;border-radius:10px;white-space:nowrap;font-weight:600;cursor:pointer;border:none;transition:background .2s}
+.cover-photo-edit:hover{background:rgba(0,0,0,.85)}
+.cover-circle-add{cursor:pointer;transition:background .2s}
+.cover-circle-add:hover{background:var(--egg-light)}
+.cover-add-hint{font-size:11px;color:#b8a060;margin-bottom:6px;font-weight:600}
+
+/* TRAY */
+.tray{background:#FAFAFA;border-top:3px solid var(--grass);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-shrink:0;min-height:74px;}
+.tray-lbl{color:#bba060;font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;white-space:nowrap;flex-shrink:0;line-height:1.7}
+.tray-cards{display:flex;gap:6px;overflow-x:auto;flex:1;padding-bottom:3px;align-items:center;scrollbar-width:thin;scrollbar-color:var(--egg) transparent}
+.tray-cards::-webkit-scrollbar{height:3px}
+.tray-cards::-webkit-scrollbar-thumb{background:var(--egg);border-radius:2px}
+.tray-hint{color:#ccc;font-size:9px;font-style:italic;white-space:nowrap}
+.tc{width:38px;flex-shrink:0;border-radius:4px;overflow:hidden;cursor:grab;aspect-ratio:.68;position:relative;box-shadow:0 2px 7px rgba(0,0,0,.15);transition:transform .15s,box-shadow .15s;border:1px solid #e0d8c0}
+.tc:hover{transform:scale(1.1) translateY(-3px);box-shadow:0 6px 14px rgba(0,0,0,.2)}
+.tc:active{cursor:grabbing}
+.tc.dragging{opacity:.3;transform:scale(.9)}
+.tc img{width:100%;height:72%;object-fit:cover;object-position:top;display:block}
+.tc .tc-foot{height:28%;background:#222;display:flex;align-items:center;justify-content:center;padding:1px 2px}
+.tc .tc-name{color:#fff;font-size:4.5px;font-weight:500;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;text-transform:uppercase}
+.btn-new-sticker{flex-shrink:0;width:38px;height:54px;border:1.5px dashed var(--egg);border-radius:4px;background:var(--egg-pale);color:var(--egg-dark);cursor:pointer;font-size:8px;font-weight:600;display:none;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:all .2s}
+.btn-new-sticker.visible{display:flex}
+.btn-new-sticker:hover{background:var(--egg-light);color:#7a5800}
+.btn-new-sticker span{font-size:14px;line-height:1}
+
+/* MODALS */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:14px;backdrop-filter:blur(5px)}
+.ov.hidden{display:none}
+.modal{background:#fff;border-radius:14px;padding:20px 18px;max-width:300px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2);border-top:3px solid var(--egg)}
+.modal h3{font-size:13px;font-weight:700;margin-bottom:13px;text-align:center;text-transform:uppercase;letter-spacing:.3px;color:#333}
+.mdrop{border:1.5px dashed #D4B800;border-radius:9px;padding:14px;text-align:center;cursor:pointer;transition:background .2s;margin-bottom:10px;background:#fafaf5}
+.mdrop:hover,.mdrop.over{background:var(--egg-pale);border-color:var(--egg)}
+.dz-prev{width:64px;margin:0 auto 4px;aspect-ratio:.68;border-radius:4px;overflow:hidden;background:#eee}
+.dz-prev img{width:100%;height:100%;object-fit:cover;object-position:top}
+.dz-icon{font-size:22px;display:block;margin-bottom:3px}
+.dz-hint{font-size:9px;color:#aaa}
+.mf{margin-bottom:9px}
+.ml{display:block;color:#aaa;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.mi{width:100%;background:#fafafa;border:1px solid #e0e0e0;border-radius:7px;color:#222;padding:8px 10px;font-size:12px;outline:none;transition:border-color .2s}
+.mi:focus{border-color:var(--egg)}
+.pos-btns{display:flex;gap:5px;flex-wrap:wrap}
+.pb{padding:6px 10px;border-radius:5px;border:1.5px solid transparent;cursor:pointer;font-size:10px;font-weight:600;transition:border-color .15s,transform .1s;white-space:nowrap}
+.pb:hover{transform:scale(1.03)}
+.pb.sel{border-color:#333!important;transform:scale(1.05);box-shadow:0 0 0 2px rgba(0,0,0,.2)}
+.mbtns{display:flex;gap:7px;margin-top:13px}
+.mbs{flex:1;padding:9px;border-radius:8px;background:var(--egg);color:#111;font-weight:700;border:none;cursor:pointer;font-size:12px;transition:opacity .2s}
+.mbs:hover{opacity:.85}
+.mbs:disabled{opacity:.3;cursor:not-allowed}
+.mbc{flex:1;padding:9px;border-radius:8px;background:#f0f0f0;color:#555;font-weight:500;border:none;cursor:pointer;font-size:12px;transition:background .2s}
+.mbc:hover{background:#e4e4e4}
+/* LIGHTBOX fullscreen */
+.lb-ov{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;z-index:4000;padding:16px;backdrop-filter:blur(8px)}
+.lb-ov.hidden{display:none}
+.lb-inner{display:flex;align-items:center;gap:16px;max-height:100%;width:100%;justify-content:center}
+.lb-arrow{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.25);color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s;user-select:none}
+.lb-arrow:hover{background:rgba(255,255,255,.28)}
+.lb-arrow.hidden{visibility:hidden}
+.lb-center{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:min(240px,60vw)}
+.lb-card{display:flex;flex-direction:column;align-items:center;gap:0;border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);width:100%}
+.lb-card img{width:100%;aspect-ratio:.714;object-fit:cover;object-position:top;display:block}
+.lb-card .lb-foot{background:#111;width:100%;padding:10px 12px 12px;text-align:center}
+.lb-card .lb-name{color:#fff;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.lb-card .lb-num{color:#888;font-size:10px;font-family:monospace;margin-bottom:6px}
+.lb-card .lb-pos{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:5px}
+.lb-actions{display:flex;flex-direction:column;gap:8px;align-items:stretch;width:100%}
+.lb-close{position:fixed;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:4001}
+.lb-close:hover{background:rgba(255,255,255,.3)}
+.lb-btn{padding:9px 14px;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:opacity .2s;text-align:center}
+.lb-btn:hover{opacity:.82}
+.lb-btn.ret{background:#dde8fa;color:#1a4a90}
+.lb-btn.del{background:#ffe0e0;color:#b02020}
+.lb-btn.dl{background:var(--egg);color:#111}
+.lb-btn.ret.hidden,.lb-btn.del.hidden{display:none}
+/* legacy modal kept hidden — only lightbox used now */
+.mb-ret{display:none}.mb-del{display:none}
+.vc-wrap{width:95px;margin:0 auto 12px;border-radius:7px;overflow:hidden;aspect-ratio:.68;box-shadow:0 5px 20px rgba(0,0,0,.18);position:relative}
+.vc-wrap img{width:100%;height:72%;object-fit:cover;object-position:top;display:block}
+.vc-wrap .vc-foot{height:28%;background:#222;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 4px}
+.vc-wrap .vc-name{color:#fff;font-size:8px;font-weight:600;text-transform:uppercase;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.vc-wrap::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 35%,rgba(255,255,255,.1) 55%,transparent 80%);pointer-events:none}
+.vc-num-tag{position:absolute;top:3px;left:4px;font-size:7px;font-weight:600;color:rgba(255,255,255,.9);background:rgba(0,0,0,.45);padding:1px 3px;border-radius:2px;font-family:monospace;z-index:4}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div class="setup-ov" id="setup-ov">
+  <div class="setup-box">
+    <h2>⚙️ Configurar Firebase</h2>
+    <p>Para que o álbum seja compartilhado, conecte ao Firebase.</p>
+    <ol>
+      <li>Acesse <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></li>
+      <li>Crie um projeto → ative o <b>Firestore</b> em modo de teste</li>
+      <li>⚙️ Configurações → "Seus apps" → clique <b>&lt;/&gt;</b> (Web)</li>
+      <li>Copie o bloco <code>firebaseConfig = {...}</code> e cole abaixo</li>
+    </ol>
+    <textarea class="setup-ta" id="setup-ta" placeholder='Cole aqui o objeto firebaseConfig...'></textarea>
+    <button class="setup-btn" onclick="doSetup()">Conectar ao Firebase</button>
+    <div class="setup-err" id="setup-err">Config inválida. Verifique e tente novamente.</div>
+  </div>
+</div>
+
+<!-- PIN MODAL -->
+<div class="pin-ov hidden" id="ov-pin">
+  <div class="pin-box">
+    <h3>🔐 Modo Edição</h3>
+    <p>Digite o PIN para editar o álbum</p>
+    <input class="pin-input" id="pin-input" type="password" placeholder="••••" maxlength="20"
+      onkeydown="if(event.key==='Enter')checkPin()">
+    <button class="pin-btn" onclick="checkPin()">Entrar</button>
+    <button class="pin-cancel" onclick="document.getElementById('ov-pin').classList.add('hidden');document.getElementById('pin-input').value=''">Cancelar</button>
+    <div class="pin-err" id="pin-err">PIN incorreto. Tente novamente.</div>
+  </div>
+</div>
+
+<!-- ALBUM -->
+<div class="album-shell">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="tb-brand">
+      <div class="tb-logo">ML</div>
+      <div class="tb-titles">
+        <div class="tb-main">Álbum Meli Londrina</div>
+        <div class="tb-sub">Official Corporate Edition · 2026</div>
+      </div>
+    </div>
+    <div class="tb-right">
+      <div class="fb-status" id="fb-status">
+        <div class="fb-dot yellow" id="fb-dot"></div>
+        <span id="fb-label">Conectando…</span>
+      </div>
+      <button class="lock-btn" id="lock-btn" onclick="toggleAdmin()">🔒 Visualizando</button>
+      <button class="add-rep-btn" id="add-rep-btn" onclick="addRepsPage()">+ Página Reps</button>
+    </div>
+  </div>
+
+  <!-- UNIT TABS -->
+  <div class="unit-tabs">
+    <button class="utab active" onclick="switchUnit('spr2')">SPR2</button>
+    <button class="utab"        onclick="switchUnit('xpr2')">XPR2</button>
+  </div>
+
+  <!-- PAGE NAV -->
+  <div class="page-nav" id="page-nav"></div>
+
+  <!-- VIEW BANNER -->
+  <div class="view-banner" id="view-banner">👁️ Modo visualização — apenas o administrador pode editar</div>
+
+  <!-- SINGLE PAGE -->
+  <div class="page-area" id="page-area"></div>
+
+  <!-- TRAY -->
+  <div class="tray">
+    <div class="tray-lbl">FIGU-<br>RINHAS</div>
+    <div class="tray-cards" id="tray-cards"></div>
+    <button class="btn-new-sticker" id="btn-nova" onclick="openAddSticker()">
+      <span>+</span><span>Nova</span>
+    </button>
+  </div>
+
+</div>
+
+<!-- ADD STICKER MODAL -->
+<div class="ov hidden" id="ov-add">
+  <div class="modal">
+    <h3 id="add-title">Nova Figurinha</h3>
+    <div class="mdrop" id="mdrop" onclick="document.getElementById('mfile').click()"
+         ondragover="mOver(event)" ondragleave="mLeave(event)" ondrop="mDropFile(event)">
+      <div class="dz-prev" id="dz-prev" style="display:none"><img id="dz-img" src="" alt=""></div>
+      <span class="dz-icon" id="dz-icon">📷</span>
+      <div class="dz-hint" id="dz-hint">Clique ou arraste a foto aqui</div>
+    </div>
+    <input type="file" id="mfile" accept="image/*" style="display:none" onchange="onFile(event)">
+<input type="file" id="cover-file-input" accept="image/*" style="display:none" onchange="onCoverPhoto(event)">
+    <div class="mf">
+      <label class="ml">Nome</label>
+      <input type="text" id="m-name" class="mi" placeholder="Ex: Tarcila Santos" maxlength="22" oninput="chkReady()">
+    </div>
+    <div class="mf">
+      <label class="ml">Cargo</label>
+      <div class="pos-btns" id="pos-btns"></div>
+    </div>
+    <div class="mbtns">
+      <button class="mbs" id="mbs" onclick="doAddSticker()" disabled>✔ Criar</button>
+      <button class="mbc" onclick="closeAdd()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW STICKER MODAL (legacy, hidden) -->
+<div class="ov hidden" id="ov-view" style="display:none">
+  <div class="modal">
+    <div class="vc-wrap"><span class="vc-num-tag" id="vc-num"></span><img id="vc-img" src="" alt=""><div class="vc-foot"><div class="vc-name" id="vc-name"></div><div class="s-pos" id="vc-pos"></div></div></div>
+    <button class="mb-ret hidden" id="mb-ret" onclick="retSticker()">↩ Devolver à cartela</button>
+    <button class="mb-del hidden" id="mb-del" onclick="delSticker()">🗑️ Excluir figurinha</button>
+  </div>
+</div>
+
+<!-- LIGHTBOX FULLSCREEN -->
+<div class="lb-ov hidden" id="lb-ov">
+  <button class="lb-close" onclick="closeLB()">✕</button>
+  <div class="lb-inner">
+    <button class="lb-arrow" id="lb-prev" onclick="navLB(-1)">‹</button>
+    <div class="lb-center">
+      <div class="lb-card" id="lb-card">
+        <img id="lb-img" src="" alt="">
+        <div class="lb-foot">
+          <div class="lb-num" id="lb-num"></div>
+          <div class="lb-name" id="lb-name"></div>
+          <span class="lb-pos s-pos" id="lb-pos"></span>
+        </div>
+      </div>
+      <div class="lb-actions" id="lb-actions">
+        <button class="lb-btn dl" id="lb-dl" onclick="downloadSticker()">⬇️ Baixar figurinha</button>
+        <button class="lb-btn ret hidden" id="lb-ret" onclick="retSticker()">↩ Devolver à cartela</button>
+        <button class="lb-btn del hidden" id="lb-del" onclick="delSticker()">🗑️ Excluir</button>
+      </div>
+    </div>
+    <button class="lb-arrow" id="lb-next" onclick="navLB(1)">›</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ══ FIREBASE CONFIG ══ */
+const BAKED_CONFIG = {
+  apiKey: "AIzaSyDO-jWLokublIYSsMoRqfZvuwnWJXtM0KQ",
+  authDomain: "meli-londrina-album.firebaseapp.com",
+  projectId: "meli-londrina-album",
+  storageBucket: "meli-londrina-album.firebasestorage.app",
+  messagingSenderId: "962754343517",
+  appId: "1:962754343517:web:c7bd25ca044d26a63113b4"
+};
+
+/* ══ ADMIN PIN ══ */
+const ADMIN_PIN = "meli2026";
+let isAdmin = false;
+
+function toggleAdmin(){
+  if(isAdmin){
+    isAdmin = false;
+    updateAdminUI();
+  } else {
+    document.getElementById('pin-err').style.display='none';
+    document.getElementById('pin-input').value='';
+    document.getElementById('ov-pin').classList.remove('hidden');
+    setTimeout(()=>document.getElementById('pin-input').focus(), 100);
+  }
+}
+
+function checkPin(){
+  const val = document.getElementById('pin-input').value;
+  if(val === ADMIN_PIN){
+    isAdmin = true;
+    document.getElementById('ov-pin').classList.add('hidden');
+    document.getElementById('pin-input').value='';
+    document.getElementById('pin-err').style.display='none';
+    updateAdminUI();
+  } else {
+    document.getElementById('pin-err').style.display='block';
+  }
+}
+
+function updateAdminUI(){
+  const lockBtn = document.getElementById('lock-btn');
+  lockBtn.textContent = isAdmin ? '🔓 Editando' : '🔒 Visualizando';
+  lockBtn.classList.toggle('admin', isAdmin);
+  document.getElementById('add-rep-btn').classList.toggle('visible', isAdmin);
+  document.getElementById('btn-nova').classList.toggle('visible', isAdmin);
+  document.getElementById('view-banner').classList.toggle('visible', !isAdmin);
+  render();
+}
+
+/* ══ FIREBASE ══ */
+let fbApp, fbDb;
+
+function doSetup(){
+  const raw = document.getElementById('setup-ta').value.trim();
+  try{
+    const match = raw.match(/\{[\s\S]+\}/);
+    if(!match) throw new Error();
+    const json = match[0].replace(/(\w+)\s*:/g,'"$1":').replace(/:\s*"([^"]+)"/g,(m,v)=>`:"${v}"`).replace(/,\s*\}/g,'}');
+    const cfg = JSON.parse(json);
+    if(!cfg.apiKey||!cfg.projectId) throw new Error();
+    localStorage.setItem('fb_cfg',JSON.stringify(cfg));
+    document.getElementById('setup-err').style.display='none';
+    initFirebase(cfg);
+  }catch(e){ document.getElementById('setup-err').style.display='block'; }
+}
+
+function initFirebase(cfg){
+  if(fbApp) return;
+  fbApp = firebase.initializeApp(cfg);
+  fbDb  = firebase.firestore();
+  document.getElementById('setup-ov').classList.add('hidden');
+  setStatus('yellow','Carregando…');
+  setupListeners();
+}
+
+function setStatus(c,l){
+  document.getElementById('fb-dot').className='fb-dot '+c;
+  document.getElementById('fb-label').textContent=l;
+}
+
+/* ══ SECTIONS — cargos atualizados ══ */
+const SECTIONS = {
+  cover:   { type:'cover',   label:'Capa',    emoji:'⚽', leftSlots:0,  rightSlots:0 },
+  lideres: { type:'lideres', label:'Líderes', emoji:'👑', leftSlots:4,  rightSlots:6,  cols:5,
+             positions:['Gerente','Supervisor','TL','Analista'],
+             slogan:'A liderança que move o time' },
+  ops:     { type:'ops',     label:'OPS',     emoji:'⚙️', leftSlots:6,  rightSlots:9,  cols:5,
+             positions:['Op3','Op2'],
+             slogan:'Operações que nunca param' },
+  reps:    { type:'reps',    label:'Reps',    emoji:'⭐', leftSlots:9,  rightSlots:9,  cols:6,
+             positions:['Rep1','Rep2'],
+             slogan:'Representando o futuro' }
+};
+
+/* ══ STATE ══ */
+function makeUnit(uid){
+  const tL=SECTIONS.lideres.leftSlots+SECTIONS.lideres.rightSlots;
+  const tO=SECTIONS.ops.leftSlots+SECTIONS.ops.rightSlots;
+  const tR=SECTIONS.reps.leftSlots+SECTIONS.reps.rightSlots;
+  return{ id:uid, curPage:0, coverPhoto:null,
+    pages:[
+      {type:'cover'},
+      {type:'lideres',slots:Array(tL).fill(null)},
+      {type:'ops',    slots:Array(tO).fill(null)},
+      {type:'reps',num:1,slots:Array(tR).fill(null)}
+    ]};
+}
+
+let db={curUnit:'spr2',units:{spr2:makeUnit('spr2'),xpr2:makeUnit('xpr2')}};
+let allStickers={};
+let stickerLoaded=false;
+let pendingImg=null,pendingPos=null,dragStickerID=null,viewCtx=null;
+let addCtxPage=null,addCtxSlot=null;
+
+/* ══ FIRESTORE LISTENERS ══
+   Navegar (mudar aba/página) é LOCAL — não afeta outras pessoas.
+   Apenas colocação de figurinhas é sincronizada.
+*/
+function setupListeners(){
+  fbDb.collection('meli_album').doc('state').onSnapshot(doc=>{
+    if(doc.exists){
+      const d=doc.data();
+      // Atualiza slots e capa vindos do Firebase, preservando navegação local
+      ['spr2','xpr2'].forEach(uid=>{
+        if(d[uid+'_pages']){
+          const incoming = d[uid+'_pages'];
+          const savedPage = db.units[uid].curPage;
+          db.units[uid].pages = incoming;
+          db.units[uid].curPage = Math.min(savedPage, incoming.length - 1);
+        }
+        if(d[uid+'_coverPhoto'] !== undefined) db.units[uid].coverPhoto = d[uid+'_coverPhoto'];
+      });
+    }
+    setStatus('green','Online ●');
+    render();
+  },err=>{ setStatus('red','Erro'); console.error(err); });
+
+  fbDb.collection('meli_stickers').onSnapshot(snap=>{
+    allStickers={};
+    snap.forEach(doc=>{ allStickers[doc.id]=doc.data(); });
+    stickerLoaded=true;
+    cleanStaleRefs(); // remove referências órfãs assim que soubermos quais stickers existem
+    render();
+  },err=>console.error(err));
+}
+
+/* Salva slots e fotos de capa (não curPage nem curUnit) */
+function saveDB(){
+  if(!fbDb) return;
+  fbDb.collection('meli_album').doc('state').set({
+    spr2_pages: db.units.spr2.pages,
+    xpr2_pages: db.units.xpr2.pages,
+    spr2_coverPhoto: db.units.spr2.coverPhoto || null,
+    xpr2_coverPhoto: db.units.xpr2.coverPhoto || null,
+  }).catch(e=>console.error(e));
+}
+
+/* ══ HELPERS ══ */
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function uid2(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
+function curUnit(){return db.units[db.curUnit]}
+function curPage(){return curUnit().pages[curUnit().curPage]}
+function getSticker(id){return allStickers[id]}
+function isPlaced(id){return Object.values(db.units).some(u=>u.pages.some(p=>p.slots&&p.slots.includes(id)))}
+function fmtNum(n){return '#'+String(n).padStart(3,'0')}
+function globalSlotNum(pi,si){let n=0;for(let i=0;i<pi;i++){const p=curUnit().pages[i];if(p.slots)n+=p.slots.length;}return n+si+1;}
+
+/* ══ DELETAR CAMPO (SLOT) ══ */
+function deleteSlot(pageIdx, slotIdx){
+  if(!isAdmin) return;
+  const page = curUnit().pages[pageIdx];
+  if(!page || !page.slots) return;
+  // Se tiver figurinha, ela volta à cartela (permanece em allStickers, só sai do slot)
+  page.slots.splice(slotIdx, 1);
+  saveDB(); render();
+}
+
+/* ══ LIMPEZA DE REFERÊNCIAS ÓRFÃS ══
+   Remove IDs de slots cujo documento não existe mais no Firestore.
+   Só roda depois que stickerLoaded=true (evita apagar refs durante carga inicial). */
+function cleanStaleRefs(){
+  if(!stickerLoaded) return;
+  let dirty=false;
+  Object.values(db.units).forEach(u=>{
+    u.pages.forEach(p=>{
+      if(!p.slots) return;
+      p.slots.forEach((v,i)=>{
+        if(v && !allStickers[v]){ p.slots[i]=null; dirty=true; }
+      });
+    });
+  });
+  if(dirty) saveDB();
+}
+
+/* ══ NAVIGATION (local only) ══ */
+function switchUnit(id){ db.curUnit=id; updateUnitTabs(); render(); }
+function updateUnitTabs(){
+  document.querySelectorAll('.utab').forEach(t=>{
+    t.classList.toggle('active',t.textContent.trim().toLowerCase()===db.curUnit.toLowerCase());
+  });
+}
+
+/* ══ ADD REPS PAGE ══ */
+function addRepsPage(){
+  if(!isAdmin) return;
+  const unit=curUnit();
+  const rc=unit.pages.filter(p=>p.type==='reps').length;
+  const total=SECTIONS.reps.leftSlots+SECTIONS.reps.rightSlots;
+  unit.pages.push({type:'reps',num:rc+1,slots:Array(total).fill(null)});
+  unit.curPage=unit.pages.length-1;
+  saveDB(); render();
+}
+
+/* ══ RENDER ══ */
+function render(){renderPageNav();renderPage();renderTray();}
+
+function renderPageNav(){
+  const nav=document.getElementById('page-nav'); nav.innerHTML='';
+  const unit=curUnit();
+  unit.pages.forEach((p,i)=>{
+    const sec=SECTIONS[p.type];
+    const label=sec.label;
+    if(i>0&&(p.type==='lideres'||p.type==='ops'||(p.type==='reps'&&p.num===1))){
+      const sep=document.createElement('span');sep.className='pnav-sep';sep.textContent='›';nav.appendChild(sep);
+    }
+    const btn=document.createElement('button');
+    btn.className=`pnav-btn ${i===unit.curPage?'active':''}`;
+    btn.textContent=`${sec.emoji} ${label}`;
+    btn.onclick=()=>{ unit.curPage=i; render(); }; // local only
+    if(p.type==='reps'&&p.num>1&&isAdmin){
+      btn.title='Clique 2× para deletar';
+      btn.addEventListener('dblclick',e=>{
+        e.stopPropagation();
+        unit.pages.splice(i,1);
+        if(unit.curPage>=unit.pages.length) unit.curPage=unit.pages.length-1;
+        saveDB(); render();
+      });
+    }
+    nav.appendChild(btn);
+  });
+}
+
+function renderPage(){
+  const pg=document.getElementById('page-area');
+  pg.innerHTML='';
+  const page=curPage(), sec=SECTIONS[page.type], unit=curUnit();
+  if(page.type==='cover'){ renderCover(pg); return; }
+  pg.className='page-area';
+
+  // Section header
+  const hdr=document.createElement('div'); hdr.className='sec-header';
+  hdr.innerHTML=`
+    <div class="sec-icon-wrap">${sec.emoji}</div>
+    <div class="sec-header-text">
+      <div class="sec-we-are">We Are</div>
+      <div class="sec-name-big">${sec.label}</div>
+      <div class="sec-meta">
+        <span class="sec-unit-pill">${unit.id.toUpperCase()}</span>
+        <span class="sec-slogan">${sec.slogan||''}</span>
+      </div>
+    </div>`;
+  pg.appendChild(hdr);
+
+  // All slots in one grid
+  const totalSlots = sec.leftSlots + sec.rightSlots;
+  const grid = document.createElement('div');
+  grid.className = `sticker-grid grid-${sec.cols}col`;
+
+  // helper: botão de deletar slot (visível ao hover em modo admin)
+  function mkDelBtn(pi, si){
+    const btn=document.createElement('button');
+    btn.className='slot-del'; btn.textContent='×'; btn.title='Remover campo';
+    btn.onclick=e=>{ e.stopPropagation(); deleteSlot(pi,si); };
+    return btn;
+  }
+
+  for(let i=0; i<page.slots.length; i++){
+    const sId = page.slots[i];
+    const num = globalSlotNum(unit.curPage, i);
+
+    const wrapper=document.createElement('div');
+    wrapper.dataset.slotIdx = i; // usado pelo drag delegation
+
+    if(sId){
+      const s=getSticker(sId);
+      if(!s){
+        // ID no Firestore mas documento não existe → slot órfão
+        wrapper.className='slot-wrap' + (isAdmin?' editable':'');
+        const slot=document.createElement('div');
+        slot.className='slot empty';
+        if(isAdmin){
+          slot.innerHTML=`<span class="s-num" style="color:#c03030">${i+1}</span><span class="s-mark" style="font-size:9px;color:#c03030">✕</span>`;
+          slot.title='Referência inválida — clique para limpar';
+          slot.onclick=()=>{ curUnit().pages[unit.curPage].slots[i]=null; saveDB(); render(); };
+          wrapper.appendChild(mkDelBtn(unit.curPage,i));
+        } else {
+          slot.innerHTML=`<span class="s-num">${i+1}</span><span class="s-mark" style="font-size:8px;color:#b0a080">...</span>`;
+        }
+        wrapper.appendChild(slot); grid.appendChild(wrapper);
+        continue;
+      }
+      wrapper.className='slot-wrap' + (isAdmin?' editable':'');
+      wrapper.onclick=()=>{ if(_didDrop) return; openView(unit.curPage,i); };
+      if(isAdmin){
+        wrapper.draggable=true;
+        wrapper.addEventListener('dragstart',e=>{
+          dragStickerID=sId;
+          wrapper.classList.add('dragging');
+          e.dataTransfer.effectAllowed='move';
+          e.dataTransfer.setData('text/plain',sId);
+          try{ e.dataTransfer.setDragImage(wrapper,20,20); }catch(_){}
+        });
+        wrapper.addEventListener('dragend',()=>{
+          dragStickerID=null;
+          document.querySelectorAll('.slot-wrap.dragging').forEach(w=>w.classList.remove('dragging'));
+        });
+        wrapper.appendChild(mkDelBtn(unit.curPage,i));
+      }
+      const card=document.createElement('div');
+      card.className='slot filled';
+      const numTag=document.createElement('span'); numTag.className='s-num-placed'; numTag.textContent=fmtNum(num);
+      const img=document.createElement('img');
+      img.className='s-photo'; img.src=s.photo; img.alt=esc(s.name); img.loading='lazy'; img.draggable=false;
+      card.appendChild(numTag); card.appendChild(img);
+      const below=document.createElement('div');
+      below.className='s-below';
+      below.innerHTML=`<div class="s-name">${esc(s.name)}</div><div class="s-pos p-${s.position}">${s.position}</div>`;
+      wrapper.appendChild(card); wrapper.appendChild(below);
+    } else {
+      // slot vazio
+      wrapper.className='slot-wrap' + (isAdmin?' editable':'');
+      const slot=document.createElement('div');
+      slot.className='slot empty';
+      slot.innerHTML=`<span class="s-code">${sec.label.toUpperCase().slice(0,3)}</span><span class="s-num">${i+1}</span><span class="s-mark">MELI</span>`;
+      if(isAdmin){
+        slot.onclick=()=>openAddSticker(unit.curPage,i);
+        wrapper.appendChild(mkDelBtn(unit.curPage,i));
+      }
+      wrapper.appendChild(slot);
+    }
+    grid.appendChild(wrapper);
+  }
+
+  // ── Delegação de drag no grid (funciona para qualquer slot, qualquer filho) ──
+  if(isAdmin){
+    const pageIdx = unit.curPage;
+    grid.addEventListener('dragover', e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      const w=e.target.closest('[data-slot-idx]');
+      if(w && !w.classList.contains('drag-over')){
+        grid.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+        w.classList.add('drag-over');
+      }
+    });
+    grid.addEventListener('dragleave', e=>{
+      if(!grid.contains(e.relatedTarget)){
+        grid.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+      }
+    });
+    grid.addEventListener('drop', e=>{
+      e.preventDefault();
+      grid.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+      const w=e.target.closest('[data-slot-idx]');
+      if(!w) return;
+      const slotIdx=parseInt(w.dataset.slotIdx);
+      onDrop(e, pageIdx, slotIdx);
+    });
+  }
+
+  pg.appendChild(grid);
+
+  // Info strip
+  const placed=page.slots.filter(s=>s!==null).length;
+  const curTotal=page.slots.length;
+  const strip=document.createElement('div'); strip.className='info-strip';
+  strip.innerHTML=`<div class="is-label">${sec.label} · ${unit.id.toUpperCase()}</div><div class="is-count">${placed} / ${curTotal} figurinhas</div>`;
+  if(isAdmin){
+    const addSlotBtn=document.createElement('button');
+    addSlotBtn.textContent='+ Campo';
+    addSlotBtn.style.cssText='background:var(--grass-pale);border:1px solid var(--grass-mid);color:var(--grass);border-radius:5px;padding:3px 10px;font-size:10px;font-weight:600;cursor:pointer;';
+    addSlotBtn.onclick=()=>{ page.slots.push(null); saveDB(); render(); };
+    strip.appendChild(addSlotBtn);
+  }
+  pg.appendChild(strip);
+}
+
+function renderCover(pg){
+  const unit=curUnit();
+  const counts=unit.pages.map(p=>({
+    type:p.type,
+    label:SECTIONS[p.type]?.label||'',
+    emoji:SECTIONS[p.type]?.emoji||'',
+    filled:p.slots?p.slots.filter(s=>s!==null).length:0,
+    total:p.slots?p.slots.length:0
+  })).filter(p=>p.type!=='cover');
+
+  // Círculo de capa: com foto ou sem
+  let circleHTML;
+  if(unit.coverPhoto){
+    circleHTML=`
+      <div class="cover-photo-wrap" style="background-image:url('${unit.coverPhoto}')">
+        <div class="cover-photo-overlay">
+          <div class="cover-inner-text">MERCADO LIVRE<br>· LONDRINA ·<br>TIME CAMPEÃO</div>
+        </div>
+        ${isAdmin?`<button class="cover-photo-edit" onclick="triggerCoverPhoto()">✏️ Alterar foto</button>`:''}
+      </div>`;
+  } else {
+    circleHTML=`
+      <div class="cover-circle ${isAdmin?'cover-circle-add':''}" ${isAdmin?'onclick="triggerCoverPhoto()"':''}>
+        ${isAdmin?'<div class="cover-add-hint">📷 Adicionar foto de capa</div>':''}
+        <div class="cover-inner-text">MERCADO LIVRE<br>· LONDRINA ·<br>TIME CAMPEÃO</div>
+      </div>`;
+  }
+
+  pg.className='page-area cover-page';
+  pg.innerHTML=`
+    ${circleHTML}
+    <div class="cover-title"><h1><span>Álbum</span>MELI LONDRINA</h1></div>
+    <div class="cover-unit-badge">${unit.id.toUpperCase()}</div>
+    <div class="cover-teams">${counts.map(c=>`<div class="cover-team-item"><span class="cti-emoji">${c.emoji}</span><span class="cti-name">${c.label}</span><span class="cti-slots">${c.filled}/${c.total}</span></div>`).join('')}</div>
+    <div class="cover-edition">Official Corporate Edition · Copa 2026</div>`;
+}
+
+/* ══ FOTO DE CAPA ══ */
+function triggerCoverPhoto(){
+  if(!isAdmin) return;
+  document.getElementById('cover-file-input').click();
+}
+function onCoverPhoto(e){
+  const f=e.target.files[0]; if(!f) return;
+  e.target.value='';
+  const r=new FileReader();
+  r.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=700; let w=img.width, h=img.height;
+      if(w>h){ if(w>MAX){ h=Math.round(h*MAX/w); w=MAX; } }
+      else { if(h>MAX){ w=Math.round(w*MAX/h); h=MAX; } }
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      curUnit().coverPhoto = cv.toDataURL('image/jpeg',.85);
+      saveDB(); render();
+    };
+    img.src=ev.target.result;
+  };
+  r.readAsDataURL(f);
+}
+
+/* ══ TRAY ══ */
+function renderTray(){
+  const cards=document.getElementById('tray-cards'); cards.innerHTML='';
+  const unplaced=Object.values(allStickers).filter(s=>s.unitId===db.curUnit&&!isPlaced(s.id));
+  if(!unplaced.length){
+    const h=document.createElement('div');h.className='tray-hint';
+    h.textContent= isAdmin ? 'Sem figurinhas — clique + Nova para criar' : 'Nenhuma figurinha na cartela';
+    cards.appendChild(h);return;
+  }
+  unplaced.forEach(s=>{
+    const c=document.createElement('div');
+    c.className='tc';
+    if(isAdmin){ c.draggable=true;c.dataset.id=s.id; }
+    c.innerHTML=`<img src="${s.photo}" alt="${esc(s.name)}" loading="lazy"><div class="tc-foot"><div class="tc-name">${esc(s.name)}</div></div>`;
+    // Clique abre visualização (admin pode excluir daqui)
+    c.addEventListener('click',()=>openViewById(s.id));
+    if(isAdmin){
+      c.addEventListener('dragstart',e=>{dragStickerID=s.id;c.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',s.id)});
+      c.addEventListener('dragend',()=>{dragStickerID=null;c.classList.remove('dragging')});
+    }
+    cards.appendChild(c);
+  });
+}
+
+/* ══ DRAG/DROP ══ */
+let _didDrop=false;
+function onDrop(e,pageIdx,slotIdx){
+  if(!isAdmin) return;
+  const sid=e.dataTransfer.getData('text/plain')||dragStickerID;
+  if(!sid) return;
+  _didDrop=true; setTimeout(()=>{_didDrop=false;},120);
+  const unit=curUnit();
+  // Remove de qualquer slot onde esteja (todas as unidades)
+  Object.values(db.units).forEach(u=>{ u.pages.forEach(p=>{ if(p.slots) p.slots.forEach((v,i)=>{ if(v===sid) p.slots[i]=null; }); }); });
+  unit.pages[pageIdx].slots[slotIdx]=sid;
+  saveDB(); render();
+}
+
+/* ══ ADD STICKER ══ */
+function openAddSticker(pageIdx,slotIdx){
+  if(!isAdmin) return;
+  addCtxPage=pageIdx??null; addCtxSlot=slotIdx??null;
+  pendingImg=null; pendingPos=null;
+  document.getElementById('m-name').value='';
+  document.getElementById('dz-prev').style.display='none';
+  document.getElementById('dz-icon').style.display='block';
+  document.getElementById('dz-hint').textContent='Clique ou arraste a foto aqui';
+  document.getElementById('mbs').disabled=true;
+  let sec=null;
+  if(addCtxPage!==null){ const page=curUnit().pages[addCtxPage]; sec=SECTIONS[page.type]; }
+  const positions=sec?.positions||['Gerente','Supervisor','TL','Analista'];
+  const posBox=document.getElementById('pos-btns'); posBox.innerHTML='';
+  positions.forEach(pos=>{
+    const btn=document.createElement('button');
+    btn.className=`pb p-${pos}`;btn.dataset.pos=pos;btn.textContent=pos;
+    btn.onclick=()=>{posBox.querySelectorAll('.pb').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');pendingPos=pos;chkReady();};
+    posBox.appendChild(btn);
+  });
+  document.getElementById('add-title').textContent=sec?`${sec.emoji} ${sec.label}`:'Nova Figurinha';
+  document.getElementById('ov-add').classList.remove('hidden');
+}
+function closeAdd(){document.getElementById('ov-add').classList.add('hidden')}
+function mOver(e){e.preventDefault();document.getElementById('mdrop').classList.add('over')}
+function mLeave(){document.getElementById('mdrop').classList.remove('over')}
+function mDropFile(e){e.preventDefault();document.getElementById('mdrop').classList.remove('over');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))processImg(f);}
+function onFile(e){const f=e.target.files[0];if(f)processImg(f)}
+function processImg(file){
+  const r=new FileReader();
+  r.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=1200;let w=img.width,h=img.height;
+      if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      const c2=cv.getContext('2d'); c2.imageSmoothingEnabled=true; c2.imageSmoothingQuality='high';
+      c2.drawImage(img,0,0,w,h);
+      pendingImg=cv.toDataURL('image/jpeg',.93);
+      document.getElementById('dz-img').src=pendingImg;
+      document.getElementById('dz-prev').style.display='block';
+      document.getElementById('dz-icon').style.display='none';
+      document.getElementById('dz-hint').textContent='✓ Foto pronta';
+      chkReady();
+    };
+    img.src=ev.target.result;
+  };
+  r.readAsDataURL(file);
+}
+function chkReady(){document.getElementById('mbs').disabled=!(pendingImg&&document.getElementById('m-name').value.trim()&&pendingPos);}
+function doAddSticker(){
+  if(!isAdmin) return;
+  const name=document.getElementById('m-name').value.trim();
+  if(!pendingImg||!name||!pendingPos)return;
+  const s={id:uid2(),name,position:pendingPos,photo:pendingImg,unitId:db.curUnit};
+  fbDb.collection('meli_stickers').doc(s.id).set(s).catch(e=>console.error(e));
+  if(addCtxPage!==null&&addCtxSlot!==null){
+    curUnit().pages[addCtxPage].slots[addCtxSlot]=s.id;
+    saveDB();
+  }
+  closeAdd();
+}
+
+/* ══ LIGHTBOX VIEW ══ */
+// lbList = lista ordenada de {sid, pageIdx, slotIdx} da seção atual para navegação
+let lbList=[], lbIdx=0;
+
+function buildLBList(){
+  // Monta lista: primeiro figurinhas colocadas na página atual, depois as da cartela
+  const unit=curUnit();
+  const list=[];
+  unit.pages.forEach((p,pi)=>{
+    if(!p.slots) return;
+    p.slots.forEach((sid,si)=>{ if(sid&&allStickers[sid]) list.push({sid,pageIdx:pi,slotIdx:si,fromTray:false}); });
+  });
+  // figurinhas na cartela (não colocadas)
+  Object.values(allStickers).filter(s=>s.unitId===db.curUnit&&!isPlaced(s.id)).forEach(s=>list.push({sid:s.id,fromTray:true}));
+  return list;
+}
+
+function openViewById(sid){
+  const s=getSticker(sid); if(!s) return;
+  viewCtx={fromTray:true, sid};
+  lbList=buildLBList();
+  lbIdx=lbList.findIndex(x=>x.sid===sid);
+  if(lbIdx<0) lbIdx=0;
+  showLB();
+}
+function openView(pageIdx,slotIdx){
+  const sid=curUnit().pages[pageIdx].slots[slotIdx]; if(!sid)return;
+  const s=getSticker(sid); if(!s)return;
+  viewCtx={pageIdx,slotIdx};
+  lbList=buildLBList();
+  lbIdx=lbList.findIndex(x=>x.sid===sid);
+  if(lbIdx<0) lbIdx=0;
+  showLB();
+}
+function closeView(){ closeLB(); }
+
+function showLB(){
+  if(!lbList.length) return;
+  const item=lbList[lbIdx];
+  viewCtx = item.fromTray ? {fromTray:true, sid:item.sid} : {pageIdx:item.pageIdx, slotIdx:item.slotIdx};
+  const s=getSticker(item.sid); if(!s) return;
+  const num = item.fromTray ? null : globalSlotNum(item.pageIdx, item.slotIdx);
+
+  document.getElementById('lb-img').src=s.photo;
+  document.getElementById('lb-img').alt=s.name;
+  document.getElementById('lb-name').textContent=s.name.toUpperCase();
+  document.getElementById('lb-num').textContent=num ? fmtNum(num) : '— cartela —';
+  const pos=document.getElementById('lb-pos');
+  pos.textContent=s.position; pos.className=`lb-pos s-pos p-${s.position}`;
+
+  // setas
+  document.getElementById('lb-prev').classList.toggle('hidden', lbIdx===0);
+  document.getElementById('lb-next').classList.toggle('hidden', lbIdx===lbList.length-1);
+
+  // botões admin
+  const retBtn=document.getElementById('lb-ret');
+  const delBtn=document.getElementById('lb-del');
+  retBtn._c=false; retBtn.textContent='↩ Devolver à cartela';
+  delBtn._c=false; delBtn.textContent='🗑️ Excluir';
+  retBtn.classList.toggle('hidden', !isAdmin || item.fromTray);
+  delBtn.classList.toggle('hidden', !isAdmin);
+  document.getElementById('lb-actions').style.display='flex';
+
+  document.getElementById('lb-ov').classList.remove('hidden');
+}
+
+function closeLB(){
+  document.getElementById('lb-ov').classList.add('hidden');
+  viewCtx=null;
+}
+
+function navLB(dir){
+  const next=lbIdx+dir;
+  if(next<0||next>=lbList.length) return;
+  lbIdx=next; showLB();
+}
+
+// Fechar com ESC / navegar com setas do teclado
+document.addEventListener('keydown',e=>{
+  const lb=document.getElementById('lb-ov');
+  if(lb.classList.contains('hidden')) return;
+  if(e.key==='Escape') closeLB();
+  if(e.key==='ArrowLeft') navLB(-1);
+  if(e.key==='ArrowRight') navLB(1);
+});
+
+// Swipe no celular
+(function(){
+  let tx=0;
+  document.getElementById('lb-ov').addEventListener('touchstart',e=>{ tx=e.touches[0].clientX; },{passive:true});
+  document.getElementById('lb-ov').addEventListener('touchend',e=>{
+    const dx=e.changedTouches[0].clientX-tx;
+    if(Math.abs(dx)>50) navLB(dx<0?1:-1);
+  },{passive:true});
+})();
+
+/* ══ DOWNLOAD FIGURINHA 4K ══ */
+function downloadSticker(){
+  if(!viewCtx) return;
+  const sid = viewCtx.fromTray ? viewCtx.sid : curUnit().pages[viewCtx.pageIdx].slots[viewCtx.slotIdx];
+  const s = getSticker(sid); if(!s) return;
+
+  const btn = document.getElementById('lb-dl');
+  btn.textContent = '⏳ Gerando 4K…'; btn.disabled = true;
+
+  // 4K portrait: proporção Panini real (1768×2600 → ratio ≈ 0.68)
+  const W = 3536, H = 5200; // 2× a resolução original da figurinha Panini
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  const img = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, W, H);
+    cv.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = `figurinha-${s.name.replace(/\s+/g,'-').toLowerCase()}-4k.jpg`;
+      a.href = url; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      btn.textContent = '⬇️ Baixar figurinha'; btn.disabled = false;
+    }, 'image/jpeg', 1.0); // qualidade máxima JPEG
+  };
+  img.onerror = () => { btn.textContent = '⬇️ Baixar figurinha'; btn.disabled = false; };
+  img.src = s.photo;
+}
+
+function retSticker(){
+  if(!isAdmin||!viewCtx) return;
+  const btn=document.getElementById('lb-ret');
+  if(btn._c){
+    if(viewCtx.fromTray){closeLB();return;}
+    curUnit().pages[viewCtx.pageIdx].slots[viewCtx.slotIdx]=null;
+    saveDB(); closeLB();
+  }else{
+    btn._c=true; btn.textContent='⚠️ Confirmar?';
+    setTimeout(()=>{if(btn){btn._c=false;btn.textContent='↩ Devolver à cartela';}},3000);
+  }
+}
+function delSticker(){
+  if(!isAdmin||!viewCtx) return;
+  const btn=document.getElementById('lb-del');
+  if(!btn._c){
+    btn._c=true; btn.textContent='⚠️ Confirmar?';
+    setTimeout(()=>{if(btn){btn._c=false;btn.textContent='🗑️ Excluir';}},3000);
+    return;
+  }
+  const sid=viewCtx.fromTray ? viewCtx.sid : curUnit().pages[viewCtx.pageIdx].slots[viewCtx.slotIdx];
+  if(!sid){closeLB();return;}
+  Object.values(db.units).forEach(u=>{ u.pages.forEach(p=>{if(p.slots)p.slots.forEach((v,i)=>{if(v===sid)p.slots[i]=null;})}); });
+  fbDb.collection('meli_stickers').doc(sid).delete().catch(e=>console.error(e));
+  saveDB(); closeLB();
+}
+
+/* ══ INIT ══ */
+updateAdminUI();
+updateUnitTabs();
+render();
+
+const savedCfg = BAKED_CONFIG || (()=>{
+  try{const s=localStorage.getItem('fb_cfg');return s?JSON.parse(s):null;}catch(e){return null;}
+})();
+if(savedCfg){
+  document.getElementById('setup-ov').classList.add('hidden');
+  initFirebase(savedCfg);
+}
+</script>
+</body>
+</html>
